@@ -26,6 +26,7 @@ dependencies:
   path_provider: ^1.4.5
   dio: ^3.0.7
   simple_permissions: ^0.1.9
+  encrypt: ^3.3.1
 
 dev_dependencies:
   flutter_test:

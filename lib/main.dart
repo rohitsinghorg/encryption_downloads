@@ -1,6 +1,10 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:simple_permissions/simple_permissions.dart';
 
@@ -17,11 +21,14 @@ class MyApp extends StatefulWidget {
 }
 
 class MyAppState extends State<MyApp> {
-  final imgUrl = "https://www.bensound.com/bensound-music/bensound-jazzyfrenchy.mp3";
+//  final imgUrl = "https://unsplash.com/photos/iEJVyyevw-U/download?force=true";
+//  final imgUrl = "https://www.bensound.com/bensound-music/bensound-jazzyfrenchy.mp3";
+  final imgUrl = "https://ksassets.timeincuk.net/wp/uploads/sites/55/2019/04/GettyImages-1136749971-920x584.jpg";
   bool downloading = false;
   var progressString = "";
   Permission permission = Permission.WriteExternalStorage;
   String permissionStatus = 'None';
+  String filePath;
 
   @override
   void initState() {
@@ -34,7 +41,7 @@ class MyAppState extends State<MyApp> {
     Dio dio = Dio();
     var dir = await getExternalStorageDirectory();
     try {
-      await dio.download(imgUrl, "${dir.path}/mymusic.mp3",
+      await dio.download(imgUrl, "${dir.path}/mymp.mp3",
           onReceiveProgress: (rec, total) {
         print("Rec: $rec , Total: $total");
 
@@ -52,6 +59,19 @@ class MyAppState extends State<MyApp> {
       progressString = "Completed";
     });
     print("Download completed in path: ${dir.path}");
+    filePath = '${dir.path}/mymp.mp3';
+
+    getFileFromPath(filePath);
+
+/*    String urlStr = imgUrl;
+    String fileName = urlStr.substring(urlStr.lastIndexOf('/')+1, urlStr.length);
+    String fileNameWithoutExtension = fileName.substring(0, fileName.lastIndexOf('.'));
+    String fileExtension = urlStr.substring(urlStr.lastIndexOf("."));
+
+    print("File Name: $fileName");
+    print("File Name Without Extension: $fileNameWithoutExtension");
+    print("File Extension: $fileExtension");*/
+
   }
 
   @override
@@ -145,5 +165,17 @@ class MyAppState extends State<MyApp> {
         permissionStatus = 'Permission is not determined';
       });
     }
+  }
+
+  getFileFromPath(String path) async{
+      print('getFileFromPath: $path');
+      try {
+        final file = await File(path).readAsString().then((result) {
+          print('Inside await: $result');
+        });
+        print('File content is: ${file}');
+      } on FileSystemException {
+        print('File System Exception occured');
+      }
   }
 }
