@@ -1,12 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:download_encrypt/de_button.dart';
+import 'package:download_encrypt/save_locally.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:simple_permissions/simple_permissions.dart';
+import 'package:toast/toast.dart';
 
 void main() => runApp(MaterialApp(
       home: MyApp(),
@@ -23,12 +27,16 @@ class MyApp extends StatefulWidget {
 class MyAppState extends State<MyApp> {
 //  final imgUrl = "https://unsplash.com/photos/iEJVyyevw-U/download?force=true";
 //  final imgUrl = "https://www.bensound.com/bensound-music/bensound-jazzyfrenchy.mp3";
-  final imgUrl = "https://ksassets.timeincuk.net/wp/uploads/sites/55/2019/04/GettyImages-1136749971-920x584.jpg";
+  final imgUrl =
+      "https://ksassets.timeincuk.net/wp/uploads/sites/55/2019/04/GettyImages-1136749971-920x584.jpg";
   bool downloading = false;
   var progressString = "";
   Permission permission = Permission.WriteExternalStorage;
   String permissionStatus = 'None';
   String filePath;
+  bool showImage = false;
+  Uint8List imageInBytes;
+  SaveLocally _saveLocally = SaveLocally();
 
   @override
   void initState() {
@@ -39,9 +47,9 @@ class MyAppState extends State<MyApp> {
 
   Future<void> downloadFile() async {
     Dio dio = Dio();
-    var dir = await getExternalStorageDirectory();
+    var dir = await getApplicationDocumentsDirectory();
     try {
-      await dio.download(imgUrl, "${dir.path}/mymp.mp3",
+      await dio.download(imgUrl, "${dir.path}/myimg.jpg",
           onReceiveProgress: (rec, total) {
         print("Rec: $rec , Total: $total");
 
@@ -59,7 +67,7 @@ class MyAppState extends State<MyApp> {
       progressString = "Completed";
     });
     print("Download completed in path: ${dir.path}");
-    filePath = '${dir.path}/mymp.mp3';
+    filePath = '${dir.path}/myimg.jpg';
 
     getFileFromPath(filePath);
 
@@ -71,111 +79,142 @@ class MyAppState extends State<MyApp> {
     print("File Name: $fileName");
     print("File Name Without Extension: $fileNameWithoutExtension");
     print("File Extension: $fileExtension");*/
-
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("AppBar"),
+        centerTitle: true,
+        title: Text(
+          "Ecrypted Downloads".toUpperCase(),
+          style: TextStyle(fontSize: 14, letterSpacing: 2.1, fontWeight: FontWeight.w800),
+        ),
+        backgroundColor: Color(0xFF420062),
       ),
-      body: Center(
-        child: downloading
-            ? Container(
-                height: 120.0,
-                width: 200.0,
-                child: Card(
-                  color: Colors.black,
-                  child: Column(
+      body: ListView(
+        shrinkWrap: true,
+        children: <Widget>[
+          Center(
+            child: downloading
+                ? Container(
+                    height: 120.0,
+                    width: 200.0,
+                    child: Card(
+                      color: Colors.black,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: <Widget>[
+                          CircularProgressIndicator(),
+                          SizedBox(
+                            height: 20.0,
+                          ),
+                          Text(
+                            "Downloading File: $progressString",
+                            style: TextStyle(
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
-                      CircularProgressIndicator(),
-                      SizedBox(
-                        height: 20.0,
+                      DEButton(
+                          name: 'Check Permission',
+                          function: () {
+                            checkPermission(context);
+                          }),
+                      DEButton(
+                        name: 'Request Permission',
+                        function: (){
+                          requestPermission(context);
+                        },
                       ),
-                      Text(
-                        "Downloading File: $progressString",
-                        style: TextStyle(
-                          color: Colors.white,
+                      DEButton(
+                        name: 'Download File (online)',
+                        function: (){
+                          downloadFile();
+                        },
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Divider(
+                          height: 1,
+                          color: Color(0xFF420062)
                         ),
                       ),
+                      DEButton(
+                        name: 'Get Saved File',
+                        function: () async {
+                          String path = await _saveLocally.getFilePath();
+                          print('GetStoreFile: Path is: $path');
+                          if (path == null)
+                            Toast.show("Application has not any file", context,
+                                duration: Toast.LENGTH_LONG,
+                                gravity: Toast.BOTTOM);
+                          else
+                            getFileFromPath(path);
+                        },
+                      ),
+                      Visibility(visible: showImage, child: getWidget()),
                     ],
                   ),
-                ),
-              )
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  RaisedButton(
-                      onPressed: () {
-                        checkPermission();
-                      },
-                      child: Text('Check Permission')),
-                  Text('Permission Status: '+permissionStatus),
-                  RaisedButton(onPressed: (){
-                      requestPermission();
-                  },
-                  child: Text('Request Permission')),
-                  SizedBox(height: 36),
-                  Text('Click on Download Now button', style: TextStyle(fontStyle: FontStyle.italic)),
-                  RaisedButton(onPressed: (){
-                    downloadFile();
-                  }, child: Text('Download Now'),)
-                ],
-              ),
+          )
+        ],
       ),
     );
   }
 
-  checkPermission() async {
+  checkPermission(BuildContext context) async {
     bool res = await SimplePermissions.checkPermission(permission);
     print('Check permisison is: $res');
     if (res)
-      setState(() {
-        permissionStatus = 'Permission granted';
-      });
+      Toast.show("Application has Write permission", context, duration: Toast.LENGTH_LONG, gravity:  Toast.BOTTOM);
     else
-      setState(() {
-        permissionStatus = 'Permission denied';
-      });
+      Toast.show("Application has NOT Write permission", context, duration: Toast.LENGTH_LONG, gravity:  Toast.BOTTOM);
   }
 
-  requestPermission() async {
-    PermissionStatus _permissionStatus = await SimplePermissions.requestPermission(Permission.WriteExternalStorage);
+  requestPermission(BuildContext context) async {
+    PermissionStatus _permissionStatus =
+        await SimplePermissions.requestPermission(
+            Permission.WriteExternalStorage);
     print('Inside request permission: ${_permissionStatus}');
-    if(_permissionStatus == 'authorized') {
-      setState(() {
-        permissionStatus = 'Permission granted';
-      });
-    } else if(_permissionStatus == 'deniedNeverAsk'){
-      setState(() {
-        permissionStatus = 'User set permission as never ask';
-      });
-    }else if(_permissionStatus == 'denied'){
-      setState(() {
-        permissionStatus = 'User denied Write External Storage permission';
-      });
-    }else if(_permissionStatus == 'restricted'){
-      setState(() {
-        permissionStatus = 'Permission is restricted';
-      });
+    if (_permissionStatus == PermissionStatus.authorized) {
+      Toast.show("Application has Write permission", context,
+          duration: Toast.LENGTH_LONG, gravity: Toast.BOTTOM);
+      return true;
     } else {
-      setState(() {
-        permissionStatus = 'Permission is not determined';
-      });
+      Toast.show("Application has NOT Write permission", context,
+          duration: Toast.LENGTH_LONG, gravity: Toast.BOTTOM);
     }
   }
 
-  getFileFromPath(String path) async{
-      print('getFileFromPath: $path');
-      try {
-        final file = await File(path).readAsString().then((result) {
-          print('Inside await: $result');
-        });
-        print('File content is: ${file}');
-      } on FileSystemException {
-        print('File System Exception occured');
-      }
+  getFileFromPath(String path) async {
+    print('getFileFromPath: $path');
+    if (path == null) {
+      print('Nothing stored in application');
+    } else {
+      var imgBytes =
+          await File(path).readAsBytes(); //.then((result) => print(result));
+      print('getFileFromPath: $imageInBytes');
+      setState(() {
+        imageInBytes = imgBytes;
+        showImage = true;
+      });
+      _saveLocally.storeFileNamePathType('myimg', path, 'IMAGE');
+    }
+  }
+
+  Widget getWidget() {
+    if (showImage) {
+      return ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: Image.memory(imageInBytes, width: 400, height: 400));
+    } else {
+      return Container(width: 10, height: 10);
+    }
   }
 }
