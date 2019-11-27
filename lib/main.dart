@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:connectivity/connectivity.dart';
 import 'package:dio/dio.dart';
 import 'package:download_encrypt/de_button.dart';
 import 'package:download_encrypt/save_locally.dart';
@@ -37,48 +38,45 @@ class MyAppState extends State<MyApp> {
   bool showImage = false;
   Uint8List imageInBytes;
   SaveLocally _saveLocally = SaveLocally();
+  bool showDownloadImageButton = false;
 
   @override
   void initState() {
     super.initState();
-
-//    downloadFile();
   }
 
-  Future<void> downloadFile() async {
-    Dio dio = Dio();
-    var dir = await getApplicationDocumentsDirectory();
-    try {
-      await dio.download(imgUrl, "${dir.path}/myimg.jpg",
-          onReceiveProgress: (rec, total) {
-        print("Rec: $rec , Total: $total");
+  Future<void> downloadFile(BuildContext context) async {
+    bool isInternetAvailable = await checkInternetAvailability();
+    if(isInternetAvailable) {
+      Dio dio = Dio();
+      var dir = await getApplicationDocumentsDirectory();
+      try {
+        await dio.download(imgUrl, "${dir.path}/myimg.jpg",
+            onReceiveProgress: (rec, total) {
+              print("Rec: $rec , Total: $total");
 
-        setState(() {
-          downloading = true;
-          progressString = ((rec / total) * 100).toStringAsFixed(0) + "%";
-        });
+              setState(() {
+                downloading = true;
+                progressString = ((rec / total) * 100).toStringAsFixed(0) + "%";
+              });
+            });
+      } catch (e) {
+        print(e);
+      }
+
+      setState(() {
+        downloading = false;
+        progressString = "Completed";
       });
-    } catch (e) {
-      print(e);
+      print("Download completed in path: ${dir.path}");
+      filePath = '${dir.path}/myimg.jpg';
+
+      getFileFromPath(filePath);
+
+    } else {
+      Toast.show("No Internet Connection.", context, duration: Toast.LENGTH_LONG, gravity: Toast.BOTTOM);
     }
 
-    setState(() {
-      downloading = false;
-      progressString = "Completed";
-    });
-    print("Download completed in path: ${dir.path}");
-    filePath = '${dir.path}/myimg.jpg';
-
-    getFileFromPath(filePath);
-
-/*    String urlStr = imgUrl;
-    String fileName = urlStr.substring(urlStr.lastIndexOf('/')+1, urlStr.length);
-    String fileNameWithoutExtension = fileName.substring(0, fileName.lastIndexOf('.'));
-    String fileExtension = urlStr.substring(urlStr.lastIndexOf("."));
-
-    print("File Name: $fileName");
-    print("File Name Without Extension: $fileNameWithoutExtension");
-    print("File Extension: $fileExtension");*/
   }
 
   @override
@@ -135,8 +133,12 @@ class MyAppState extends State<MyApp> {
                       ),
                       DEButton(
                         name: 'Download File (online)',
-                        function: (){
-                          downloadFile();
+                        function: () async {
+                          String path = await _saveLocally.getFilePath();
+                          if(path == null)
+                             downloadFile(context);
+                          else
+                            Toast.show("File is already downloaded", context, duration: Toast.LENGTH_LONG, gravity: Toast.BOTTOM);
                         },
                       ),
                       Padding(
@@ -197,8 +199,7 @@ class MyAppState extends State<MyApp> {
     if (path == null) {
       print('Nothing stored in application');
     } else {
-      var imgBytes =
-          await File(path).readAsBytes(); //.then((result) => print(result));
+      var imgBytes = await File(path).readAsBytes(); //.then((result) => print(result));
       print('getFileFromPath: $imageInBytes');
       setState(() {
         imageInBytes = imgBytes;
@@ -215,6 +216,17 @@ class MyAppState extends State<MyApp> {
           child: Image.memory(imageInBytes, width: 400, height: 400));
     } else {
       return Container(width: 10, height: 10);
+    }
+  }
+
+  Future<bool> checkInternetAvailability() async {
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    if (connectivityResult == ConnectivityResult.mobile) {
+      return true;
+    } else if (connectivityResult == ConnectivityResult.wifi) {
+      return true;
+    } else {
+      return false;
     }
   }
 }
